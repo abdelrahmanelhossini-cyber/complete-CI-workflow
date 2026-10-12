@@ -25,7 +25,7 @@ runs:
         extra_args: --results=verified,unknown
 
     - name: Trivy filesystem scan
-      if: inputs.phase == 'post'
+      if: inputs.phase == 'pre'
       uses: aquasecurity/trivy-action@v0.36.0
       with:
         scan-type: fs
