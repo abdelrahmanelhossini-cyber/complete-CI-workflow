@@ -1,0 +1,36 @@
+
+name: Security Scan
+description: Run Gitleaks, TruffleHog and Trivy
+
+inputs:
+  phase:
+    description: Security scan phase
+    required: true
+    default: pre
+
+runs:
+  using: composite
+  steps:
+    - name: Gitleaks secret scan
+      if: inputs.phase == 'pre'
+      uses: gitleaks/gitleaks-action@v3
+      env:
+        GITHUB_TOKEN: ${{ github.token }}
+        GITLEAKS_ENABLE_COMMENTS: "false"
+
+    - name: TruffleHog secret scan
+      if: inputs.phase == 'pre'
+      uses: trufflesecurity/trufflehog@main
+      with:
+        extra_args: --results=verified,unknown
+
+    - name: Trivy filesystem scan
+      if: inputs.phase == 'post'
+      uses: aquasecurity/trivy-action@v0.36.0
+      with:
+        scan-type: fs
+        scan-ref: .
+        scanners: vuln,misconfig,secret
+        severity: HIGH,CRITICAL
+        ignore-unfixed: true
+        exit-code: "1"
