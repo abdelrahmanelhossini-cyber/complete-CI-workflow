@@ -36,6 +36,9 @@ on:
 permissions:
   contents: read
 
+env:
+  APP_NAME: temperature
+
 jobs:
   test:
     runs-on: ubuntu-latest
@@ -60,26 +63,39 @@ jobs:
 
       - name: Report test failure
         if: failure()
-        run: echo "🚨 Tests failed on ${{ github.ref_name }}"
+        env:
+          BRANCH_NAME: ${{ github.ref_name }}
+        run: echo "🚨 Tests failed on $BRANCH_NAME"
 
   package:
     needs: test
-    if: ${{ inputs.create-package != false }}
+    if: ${{ needs.test.result == 'success' && (github.event_name != 'workflow_dispatch' || inputs.create-package) }}
     runs-on: ubuntu-latest
     timeout-minutes: 5
+
+    outputs:
+      version: ${{ steps.package_version.outputs.version }}
 
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
+      - name: Set package version
+        id: package_version
+        env:
+          RUN_NUMBER: ${{ github.run_number }}
+        run: echo "version=0.1.${RUN_NUMBER}" >> "$GITHUB_OUTPUT"
+
       - name: Create package
-        run: tar -czf app.tar.gz temperature.py test_temperature.py requirements-dev.txt
+        env:
+          APP_NAME: ${{ env.APP_NAME }}
+        run: tar -czf "${APP_NAME}.tar.gz" temperature.py test_temperature.py requirements-dev.txt
 
       - name: Upload package
         uses: actions/upload-artifact@v4
         with:
           name: app-package
-          path: app.tar.gz
+          path: temperature.tar.gz
 
   verify:
     needs: package
@@ -92,11 +108,11 @@ jobs:
         with:
           name: app-package
 
-      - name: Check package
+      - name: Verify package
         run: |
-          tar -tzf app.tar.gz
+          tar -tzf temperature.tar.gz
           mkdir extracted
-          tar -xzf app.tar.gz -C extracted
+          tar -xzf temperature.tar.gz -C extracted
           cd extracted
           python -c "from temperature import celsius_to_fahrenheit, fahrenheit_to_celsius, is_freezing; assert celsius_to_fahrenheit(0) == 32; assert fahrenheit_to_celsius(32) == 0; assert is_freezing(-5); print('Package verified successfully')"
 
@@ -107,7 +123,26 @@ jobs:
     timeout-minutes: 5
 
     steps:
-      - name: Report job results
+      - name: Write job summary
+        env:
+          APP_NAME: ${{ env.APP_NAME }}
+          VERSION: ${{ needs.package.outputs.version || 'n/a' }}
+          COMMIT_SHA: ${{ github.sha }}
+          EVENT_NAME: ${{ github.event_name }}
+          TEST_RESULT: ${{ needs.test.result }}
+          PACKAGE_RESULT: ${{ needs.package.result }}
         run: |
-          echo "Test result: ${{ needs.test.result }}"
-          echo "Package result: ${{ needs.package.result }}"
+          SHORT_SHA="${COMMIT_SHA:0:7}"
+
+          {
+            echo "## CI Report"
+            echo ""
+            echo "| Item | Result |"
+            echo "|---|---|"
+            echo "| App name | $APP_NAME |"
+            echo "| Version | $VERSION |"
+            echo "| Commit | $SHORT_SHA |"
+            echo "| Event | $EVENT_NAME |"
+            echo "| Test | $TEST_RESULT |"
+            echo "| Package | $PACKAGE_RESULT |"
+          } >> "$GITHUB_STEP_SUMMARY"
