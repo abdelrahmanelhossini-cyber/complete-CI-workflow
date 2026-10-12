@@ -34,3 +34,7 @@ runs:
         severity: HIGH,CRITICAL
         ignore-unfixed: true
         exit-code: "1"
+    - name: SonarQube Scan
+      uses: SonarSource/sonarqube-scan-action@v6
+      env:
+        SONAR_TOKEN: ${{ secrets.SONARQUBE_TOKEN}}
