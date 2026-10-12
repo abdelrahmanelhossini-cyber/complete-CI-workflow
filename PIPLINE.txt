@@ -1,0 +1,24 @@
+# CI Pipeline
+
+## 1. Triggers
+- `push`: Test new changes.
+- `pull_request`: Test changes before merging.
+- `workflow_dispatch`: Run manually.
+
+## 2. Jobs
+- `test`: Run pytest.
+- `package`: Build the Python package.
+- `verify`: Check the package.
+
+```text
+test → package → verify
+```
+
+## 3. Artifact
+A Python wheel package (`.whl`).
+
+## 4. Pipeline Type
+CI, because it tests and packages code without deploying it.
+
+## 5. Test Failure
+Skip the package job if tests fail to avoid packaging broken code.
